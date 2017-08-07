@@ -1,0 +1,278 @@
+﻿@using Sitecore.Collections
+@using Sitecore.Data.Fields
+@using Sitecore.Form.Web.UI.Controls
+@using Sitecore.Links
+@using Sitecore.Mvc
+@using Sitecore.Resources.Media
+
+@model RenderingModel
+@{
+    Item itm = RenderingContext.Current.Rendering.Item;
+    var keyframes = itm.Children;
+    var keyFrameStrings = new List<string>();
+    var keyFrameMobileStrings = new List<string>();
+
+    if(itm != null && keyframes != null)
+    {
+        foreach (var keyframe in keyframes)
+        {
+            var keyFrameItem = keyframe as Item;
+            if(keyFrameItem != null)
+            {
+                keyFrameStrings.Add(keyFrameItem.Fields["Text"].ToString());
+                keyFrameMobileStrings.Add(keyFrameItem.Fields["Mobile Text"].ToString());
+            }
+        }
+    }
+
+    ImageField juliusImage = itm.Fields["Julius Image"];
+
+    ImageField juliusMobileImage = itm.Fields["Julius Mobile Image"];
+
+    int juliusDelay = (itm["Delay"] != "") ? Convert.ToInt32(itm["Delay"]) : 5;
+
+    int sessionCount = (itm["Session Dismissals"] != "") ? Convert.ToInt32(itm["Session Dismissals"]) : 5;
+
+    int dismissCount = (itm["Total Dismissals"] != "") ? Convert.ToInt32(itm["Total Dismissals"]) : 3;
+
+    var hideText = itm.Fields["Hide Text"];
+
+    var flavorText1 = itm.Fields["Flavor Text 1"].ToString();
+    var flavorText2 = itm.Fields["Flavor Text 2"].ToString();
+    var flavorText3 = itm.Fields["Flavor Text 3"].ToString();
+
+    List<string> flavorText = new List<string> {flavorText1, flavorText2, flavorText3};
+}
+
+@if (keyframes != null && keyframes.Count != 0 && juliusImage != null && juliusImage.MediaItem != null)
+{
+    <aside class="julius">
+        <div class="julius-text-container">
+            <div class="julius-text">
+                @keyFrameStrings[0]
+            </div>
+            <div class="julius-hide">
+                @hideText
+            </div>
+        </div>
+        <div class="julius-image"></div>
+    </aside>
+    <style>
+        .stage-wrapper {
+            overflow: hidden;
+        }
+
+        .julius-active .stage-wrapper {
+            background-color: rgba(0, 0, 0, 0.7);
+            position: relative;
+            transition: background-color 2s;
+        }
+
+        .julius-active .stage-wrapper h1, .julius-active .stage-wrapper .subheader {
+            color: #333;
+            transition: color 2s;
+        }
+
+        .julius {
+            bottom: -400px;
+            display: inline-flex;
+            height: 150px;
+            position: absolute;
+            right: 0;
+            width: 300px;
+            z-index: 20;
+        }
+
+        .julius-text-container {
+            margin-right: 10px;
+            width: 200px;
+        }
+
+        .julius-text {
+            align-items: center;
+            background-color: #fff;
+            border-radius: 5px;
+            color: #000;
+            cursor: pointer;
+            display: inline-flex;
+            font-size: 12px;
+            justify-content: center;
+            line-height: 1.3em;
+            padding: 12px;
+            position: relative;
+            min-height: 60px;
+            min-width: 175px;
+            text-align: center;
+        }
+
+        .julius-text:after {
+            content: "";
+            border-style: solid;
+            border-width: 8px 0 8px 16px;
+            border-color: transparent #FFFFFF;
+            display: block;
+            margin-top: -15px;
+            position: absolute;
+            right: -16px;
+            top: 29px;
+            width: 0;
+            z-index: 1;
+        }
+
+        .julius-hide {
+            clear: both;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 5px;
+            margin-top: 10px;
+            text-align: right;
+        }
+
+        .julius-hide:before {
+            content: 'Z';
+            font-family: 'hemingwayregular';
+            font-size: 12px;
+            margin-right: 3px;
+        }
+
+        .julius-image {
+        @if (juliusMobileImage != null & juliusMobileImage.MediaItem != null)
+        {
+            <text>
+            background-image: url("@MediaManager.GetMediaUrl(juliusMobileImage.MediaItem)");
+            </text>
+        }
+        else
+        {
+            <text>
+            background-image:url("@MediaManager.GetMediaUrl(juliusImage.MediaItem)");
+            </text>
+        }
+        background-position-x: -95px;
+            background-position-y: 10px;
+            background-repeat: no-repeat;
+            height: 250px;
+            width: 250px;
+        }
+
+        @@media screen and (min-width: 360px) {
+            .julius {
+                width: 350px;
+            }
+
+            .julius-text-container {
+                width: 250px;
+            }
+
+            .julius-image {
+                background-position-x: -100px;
+                background-position-y: 0;
+            }
+        }
+
+         @@media screen and (min-width: 480px) {
+             .julius {
+                 height: 250px;
+                 margin: 0;
+                 width: 400px;
+             }
+
+            .julius-text-container {
+                text-align: left;
+                width: 150px;
+            }
+
+             .julius-text {
+                 margin-top: 0;
+                 min-width: 0;
+                 width: 150px;
+             }
+
+             .julius-hide {
+                 margin-bottom: 0;
+                 position: static;
+             }
+
+            .julius-image {
+                background-image: url("@MediaManager.GetMediaUrl(juliusImage.MediaItem)");
+            }
+         }
+    </style>
+}
+
+@using (Html.BeginScriptContext())
+{
+    Html.AddScriptBlock(
+        @<script>
+             $(document).ready(function() {
+                 // Check and see if they've already dismissed this enough times
+                 // First, do a whole bunch of variable processing. 
+                 var dismisses = localStorage.getItem("juliusDismissCount");
+                 var sessions = localStorage.getItem("juliusSessionCount");
+                 var seenAllFrames = localStorage.getItem("seenAllFrames");
+                 dismisses = (dismisses == null) ? 0 : parseInt(dismisses);
+                 sessions = (sessions == null) ? 0 : parseInt(sessions);
+                 seenAllFrames = (seenAllFrames == null || seenAllFrames == undefined) ? false : seenAllFrames;
+
+                 // Finally, check the client
+                 if ((dismisses < @dismissCount && sessions < @sessionCount) && !seenAllFrames) {
+
+                     // jacking the getBreakpoint method from state.js for mobileness
+                     var bp;
+                     bpDoc = document.documentElement.clientWidth;
+                     bpInner = window.innerWidth; // Use for css pixel
+                     bp = (typeof bpDoc !== "undefined" && typeof bpInner !== "undefined") ? bpInner : bpDoc;
+
+                     // Julius appears!
+                     setTimeout(function() {
+                             $("header").addClass("julius-active");
+                             $(".julius").animate({ bottom: 0 }, 2000);
+                             dataLayer.push({ 'event': 'julius-referralmania-stage' });
+                             localStorage.juliusSessionCount = sessions + 1;
+                         },
+                         @juliusDelay * 1000);
+
+                     // Getting data from Sitecore and adding click listener to cycle through text
+                     var juliusText = @Html.Raw(Json.Encode(keyFrameStrings));
+                     var juliusMobileText = @Html.Raw(Json.Encode(keyFrameMobileStrings));
+                     var $juliusText = $(".julius-text");
+                     var textCounter = 0;
+                     $juliusText.click(function() {
+                         if (textCounter < @keyframes.Count) {
+                             textCounter++;
+                             if (bp <= 480 && juliusMobileText[textCounter] !== "") {
+                                 $juliusText.text(juliusMobileText[textCounter]);
+                             } else {
+                                 $juliusText.text(juliusText[textCounter]);
+                             }
+                             if (textCounter === @keyframes.Count - 1) {
+                                 localStorage.seenAllFrames = true;
+                             }
+                         }
+                     });
+
+                     // Add click listener for removing Julius from the page
+                     $(".julius-hide").click(function() {
+                         var flavorText = @Html.Raw(Json.Encode(flavorText));
+                         if (flavorText[dismisses] != "") {
+                             $juliusText.text(flavorText[dismisses]);
+                             setTimeout(function() {
+                             $('.julius').animate({ bottom: -400 }, 2000, function () {
+                                 $("header").removeClass("julius-active");
+                                 $(".julius").remove();
+                                 localStorage.juliusDismissCount = dismisses + 1;
+                                 });
+                             }, 1200);
+                         } else {
+                             $("header").removeClass("julius-active");
+                             $(".julius").remove();
+                             localStorage.juliusDismissCount = dismisses + 1;
+                         }
+                     });
+                 } else {
+                     $(".julius").remove();
+                 }
+             });
+         </script>
+    );
+}
